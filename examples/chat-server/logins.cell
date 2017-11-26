@@ -1,0 +1,36 @@
+schema Logins {
+  usernames(Nat, String) [key: 0, key: 1];
+  memberships(Nat, String);
+}
+
+Logins.login(user_id: Nat, name: String) {
+  // Inserting the entry 'self.user_id, self.name' into usernames
+  // No effect if usernames already contains such an entry
+  // Fails if a (different) entry with the same left argument or
+  // the same right argument (but not both) already exists, since
+  // that would violate the integrity constraints of usernames
+  insert usernames(self.user_id, self.name);
+}
+
+Logins.logout(user_id: Nat) {
+  // Deleting all entries whose left field equals self.user_id
+  // from both usernames and memberships
+  delete usernames(self.user_id, *), memberships(self.user_id, *);
+}
+
+Logins.join_room(user_id: Nat, room: String) {
+  // Inserting the entry 'self.user_id, self.room' into memberships
+  // No effect if memberships already contains such an entry
+  insert memberships(self.user_id, self.room);
+}
+
+Logins.leave_room(user_id: Nat, room: String) {
+  // Deleting the entry 'self.user_id, self.room' from memberships,
+  // if such entry exists, no effect otherwise
+  delete memberships(self.user_id, self.room);
+}
+
+Logins.clear {
+  // Deleting all entries from both usernames and memberships
+  delete usernames(*, *), memberships(*, *);
+}
