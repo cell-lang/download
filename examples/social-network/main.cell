@@ -1,0 +1,103 @@
+(String, String, Date, String)* people_data = (
+  ("Michael",   "Taylor",   date(12,  2, 2006),   "miki"),
+  ("John",      "Taylor",   date(27,  6, 2007),   "jonny"),
+  ("Charles",   "Wang",     date(19,  8, 2006),   "charlie"),
+  ("Jack",      "Evans",    date( 4,  5, 2006),   "jack"),
+  ("Luke",      "Brown",    date(19, 12, 2006),   "luke"),
+  ("Edward",    "Harris",   date(30,  8, 2006),   "ed"),
+  ("Neil",      "Jackson",  date( 3,  5, 2007),   "neil")
+);
+
+(Nat, Nat, Date, Maybe[Nat])* friendships_data = (
+  (0,   1,  date(27,  6, 2007),  nothing),
+  (0,   2,  date( 8,  9, 2012),  nothing),
+  (0,   6,  date(13,  2, 2014),  just(1)),
+  (1,   2,  date( 7, 11, 2013),  just(0)),
+  (1,   6,  date(10,  9, 2013),  nothing)
+);
+
+(String, Nat)* gangs_data = (
+  ("The Wild Ones",   0),
+  ("The Chosen Few",  5)
+);
+
+(Nat, Nat, Date, Int)* membership_data = (
+  (0,  0,  date(13, 2, 2017), 10),
+  (1,  0,  date(13, 2, 2017),  4),
+  (2,  0,  date(15, 2, 2017),  6),
+  (3,  1,  date(24, 6, 2017), 10),
+  (4,  1,  date(24, 6, 2017),  4),
+  (5,  1,  date(25, 6, 2017),  6),
+  (6,  0,  date(28, 2, 2017),  2)
+);
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+Main(String* args) {
+  social_network : SocialNetwork;
+
+  first_id = social_network.next_id;
+  count = max(|people_data|, |gangs_data|);
+  ok = social_network <- reserve_ids(first_id: first_id, count: count);
+  assert ok;
+
+  for n, s, d, nn @ i <- people_data:
+    id = :person(first_id + i);
+    msg = new_person(id: id, name: n, surname: s, date_of_birth: d, nickname: nn);
+    ok = social_network <- msg;
+    assert ok;
+  ;
+
+  for p1, p2, d, mp <- friendships_data:
+    id1 = :person(first_id + p1);
+    id2 = :person(first_id + p2);
+    maybe_id_3 = apply(mp, :person(first_id + $));
+    msg = have_met(
+      person_1:       id1,
+      person_2:       id2,
+      day:            d,
+      introduced_by:  value(maybe_id_3) if maybe_id_3 != nothing
+    );
+    ok = social_network <- msg;
+    assert ok;
+  ;
+
+  for n, l @ i <- gangs_data:
+    id = :gang(first_id + i);
+    leader_id = :person(first_id + l);
+    msg = new_gang(id: id, name: n, leader: leader_id);
+    ok = social_network <- msg;
+    assert ok;
+  ;
+
+  for p, g, d, r <- membership_data:
+    pid = :person(first_id + p);
+    gid = :gang(first_id + g);
+    msg = make_member(person: pid, gang: gid, date: d, rank: r);
+    ok = social_network <- msg;
+    assert ok;
+  ;
+
+  state = read social_network;
+  print state;
+
+  ok = social_network <- delete_person(id: :person(5));
+  assert ok;
+
+  state = read social_network;
+  Print("\n\n\n");
+  print state;
+
+  ok = social_network <- delete_person(id: :person(3));
+  assert ok;
+
+  ok = social_network <- delete_person(id: :person(4));
+  assert ok;
+
+  state = read social_network;
+  Print("\n\n\n");
+  print state;
+
+  Print("\n\nOK\n");
+}

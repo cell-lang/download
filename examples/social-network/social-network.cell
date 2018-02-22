@@ -1,0 +1,139 @@
+type Person = person(Int);
+type Gang   = gang(Int);
+
+
+schema SocialNetwork {
+  next_id : Int = 0;
+
+  person(Person):
+    name          : String,
+    surname       : String,
+    date_of_birth : Date;
+
+  nickname(Person, String) [key: 0, key: 1];
+
+  know_each_other(Person, Person):
+    met_on          : Date,
+    introduced_by?  : Person;
+
+  gang(Gang):
+    name    : String,
+    leader  : Person;
+
+  member(Person, Gang):
+    joined_on : Date,
+    rank      : Int;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+type ReserveIds   = reserve_ids(first_id: Int, count: Int);
+
+type NewPerson    = new_person(
+                      id:             Person,
+                      name:           String,
+                      surname:        String,
+                      date_of_birth:  Date,
+                      nickname:       String
+                    );
+
+type HaveMet      = have_met(person_1: Person, person_2: Person, day: Date, introduced_by: Person?);
+
+type NewGang      = new_gang(id: Gang, name: String, leader: Person);
+
+type MakeMember   = make_member(person: Person, gang: Gang, date: Date, rank: Int);
+
+type DeletePerson = delete_person(id: Person);
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+SocialNetwork.ReserveIds {
+  if self.first_id == next_id:
+    set next_id = next_id + self.count;
+  else
+    fail;
+  ;
+}
+
+SocialNetwork.NewPerson {
+  id = self.id;
+  insert person(id);
+  insert name(id, self.name);
+  insert surname(id, self.surname);
+  insert date_of_birth(id, self.date_of_birth);
+  insert nickname(id, self.nickname);
+}
+
+SocialNetwork.HaveMet {
+  p1 = self.person_1;
+  p2 = self.person_2;
+  insert know_each_other(p1, p2), met_on(p1, p2, self.day);
+  if self.introduced_by?:
+    insert introduced_by(p1, p2, self.introduced_by);
+  ;
+}
+
+SocialNetwork.NewGang {
+  id = self.id;
+  insert gang(id), name(id, self.name), leader(id, self.leader);
+}
+
+SocialNetwork.MakeMember {
+  insert member(self.person, self.gang);
+  insert joined_on(self.person, self.gang, self.date);
+  insert rank(self.person, self.gang, self.rank);
+}
+
+SocialNetwork.DeletePerson {
+  id = self.id;
+
+  delete person(id), name(id, *), surname(id, *), date_of_birth(id, *), nickname(id, *);
+  delete know_each_other(id, *), met_on(id, *, *), introduced_by(id, *, *);
+  delete know_each_other(*, id), met_on(*, id, *), introduced_by(*, id, *);
+  delete member(id, *), joined_on(id, *, *), rank(id, *, *);
+
+  leaderless_gangs = [g : g <- leader(?, id)];
+  for g <- isort(leaderless_gangs):
+    members = [p : p, r <- rank(?, g, ?), p != id];
+    if members == []:
+      delete gang(g), name(g, *), leader(g, *);
+      delete member(*, g), joined_on(*, g, *), rank(*, g, *);
+    else
+      ranks = [m -> rank(m, g) : m <- members];
+      max_rank_members = max_by(members, ranks($, !!));
+      new_leader = an_elem(max_rank_members);
+      update leader(g, new_leader);
+    ;
+  ;
+}
+
+
+using SocialNetwork {
+  String full_name(Person p) = name(p) & " " & surname(p);
+
+  [Person] people_born_on(Date d) = [p : p <- date_of_birth(?, d)];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+type Date = date(day: Int, month: Int, year: Int);
+
+Date date(Int day, Int month, Int year) = date(day: day, month: month, year: year);
+
+////////////////////////////////////////////////////////////////////////////////
+
+[T] max_by([T] set, (T -> Ord) f) {
+  seq = isort(set);
+  return [] if seq == ();
+  ws = (f(x) : x <- seq);
+  mw = max(ws);
+  return [x : x @ i <~ seq, ws(i) == mw];
+}
+
+T an_elem([T] s) = {
+  ses = isort(s);
+  return ses(0);
+};
